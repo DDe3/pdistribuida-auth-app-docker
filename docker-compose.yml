@@ -1,0 +1,72 @@
+version: '3'
+
+services:
+
+  # Hace un proxy de los request a los servicios
+  reverse-proxy:
+    image: nginx:1.17.10
+    container_name: reverse-proxy
+    depends_on:
+      - web
+      - login-service
+      - signin-service
+    volumes:
+      - ./reverse-proxy/nginx.conf:/etc/nginx/nginx.conf
+    ports:
+      - 80:80
+
+  # Backing service (Mongodb)
+  mongo:
+    image: mongo:latest
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: root
+      MONGO_INITDB_ROOT_PASSWORD: secret
+    volumes:
+      - ./backing-service/data:/data/db
+      - ./backing-service/data/log:/var/log/mongodb/
+    ports:
+    - 27017:27017
+    restart: on-failure
+
+  # Aplicación Vue
+  web:
+    image: dde3/pdistribuida-front-end
+    container_name: pdistribuida-front-end
+    build:
+      context: ./front-end
+    ports:
+      - 8080:80
+    depends_on:
+      - login-service
+      - signin-service
+    restart: on-failure
+
+  # API de login
+  login-service:
+    image: dde3/pdistribuida-api-login
+    container_name: pdistribuida-api-login
+    depends_on:
+      - mongo
+    build:
+      context: ./api-login
+    env_file:
+      - ./api-login/.env
+      #- ./api-login/prod.env
+    ports:
+      - 5000:5000
+    restart: on-failure
+
+  # API de signin
+  signin-service:
+    image: dde3/pdistribuida-api-signin
+    container_name: pdistribuida-api-signin
+    depends_on:
+      - mongo
+    build: 
+      context: ./api-signin
+    env_file:
+      - ./api-signin/.env
+      #- ./api-signin/.env
+    ports:
+      - 5001:5001
+  
